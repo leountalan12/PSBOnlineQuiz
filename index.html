@@ -5,7 +5,6 @@
 <title>Proctored Online Examination</title>
 
 <style>
-
 body{
 font-family:Arial;
 background:#f4f4f4;
@@ -75,7 +74,6 @@ width:80%;
 .danger{color:red;}
 
 </style>
-
 </head>
 
 <body>
@@ -100,13 +98,14 @@ width:80%;
 
 <button onclick="generateLink()">Generate Student Link</button>
 
-<button id="startExam">Start Exam</button>
-
 <br><br>
 
 <input id="studentLink" readonly placeholder="Student exam link will appear here">
 
 </div>
+
+<!-- START BUTTON ALWAYS VISIBLE -->
+<button id="startExam">Start Exam</button>
 
 <!-- CAMERA MONITOR -->
 <div id="cameraBox">
@@ -117,7 +116,6 @@ width:80%;
 <iframe id="examForm"></iframe>
 
 <script>
-
 let seconds = 1800;
 let timerInterval;
 let examStarted = false;
@@ -128,179 +126,96 @@ const video = document.getElementById("camera");
 const formFrame = document.getElementById("examForm");
 
 function updateTimerDisplay(){
-
-let m = Math.floor(seconds/60);
-let s = seconds%60;
-
-timerDisplay.innerHTML =
-String(m).padStart(2,'0') + ":" +
-String(s).padStart(2,'0');
-
+    let m = Math.floor(seconds/60);
+    let s = seconds%60;
+    timerDisplay.innerHTML = String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
 }
 
 function loadForm(){
-
-let link = document.getElementById("formLink").value;
-
-if(link===""){
-alert("Paste Google Form link first.");
-return;
-}
-
-if(!link.includes("embedded")){
-link = link.replace("viewform","viewform?embedded=true");
-}
-
-formFrame.src = link;
-
-let minutes = document.getElementById("timeInput").value;
-
-seconds = minutes * 60;
-
-updateTimerDisplay();
-
+    let link = document.getElementById("formLink").value;
+    if(link===""){ alert("Paste Google Form link first."); return; }
+    if(!link.includes("embedded")){ link = link.replace("viewform","viewform?embedded=true"); }
+    formFrame.src = link;
+    let minutes = document.getElementById("timeInput").value;
+    seconds = minutes * 60;
+    updateTimerDisplay();
 }
 
 function generateLink(){
-
-let form = document.getElementById("formLink").value;
-let time = document.getElementById("timeInput").value;
-
-if(form===""){
-alert("Paste Google Form link first.");
-return;
-}
-
-let baseURL = window.location.origin + window.location.pathname;
-
-let link = baseURL + "?form=" + encodeURIComponent(form) + "&time=" + time;
-
-document.getElementById("studentLink").value = link;
-
+    let form = document.getElementById("formLink").value;
+    let time = document.getElementById("timeInput").value;
+    if(form===""){ alert("Paste Google Form link first."); return; }
+    let baseURL = window.location.origin + window.location.pathname;
+    let link = baseURL + "?form=" + encodeURIComponent(form) + "&time=" + time;
+    document.getElementById("studentLink").value = link;
 }
 
 document.getElementById("startExam").addEventListener("click", startExam);
 
 async function startExam(){
-
-if(examStarted) return;
-
-try{
-
-stream = await navigator.mediaDevices.getUserMedia({video:true});
-
-video.srcObject = stream;
-
-examStarted = true;
-
-startTimer();
-
-openFullscreen();
-
-}
-catch(error){
-
-alert("Camera permission is required before starting.");
-
-}
-
+    if(examStarted) return;
+    try{
+        stream = await navigator.mediaDevices.getUserMedia({video:true});
+        video.srcObject = stream;
+        examStarted = true;
+        startTimer();
+        openFullscreen();
+    }
+    catch(error){
+        alert("Camera permission is required before starting.");
+    }
 }
 
 function startTimer(){
-
-timerInterval = setInterval(function(){
-
-let minutes = Math.floor(seconds/60);
-let secs = seconds % 60;
-
-timerDisplay.innerHTML =
-String(minutes).padStart(2,'0') + ":" +
-String(secs).padStart(2,'0');
-
-if(seconds <= 300){
-timerDisplay.classList.add("warning");
-}
-
-if(seconds <= 60){
-timerDisplay.classList.add("danger");
-}
-
-if(seconds <= 0){
-
-clearInterval(timerInterval);
-
-alert("Time is finished. Submit your form.");
-
-window.scrollTo(0,document.body.scrollHeight);
-
-}
-
-seconds--;
-
-},1000);
-
+    timerInterval = setInterval(function(){
+        let minutes = Math.floor(seconds/60);
+        let secs = seconds % 60;
+        timerDisplay.innerHTML = String(minutes).padStart(2,'0') + ":" + String(secs).padStart(2,'0');
+        if(seconds <= 300){ timerDisplay.classList.add("warning"); }
+        if(seconds <= 60){ timerDisplay.classList.add("danger"); }
+        if(seconds <= 0){
+            clearInterval(timerInterval);
+            alert("Time is finished. Submit your form.");
+            window.scrollTo(0,document.body.scrollHeight);
+        }
+        seconds--;
+    },1000);
 }
 
 function openFullscreen(){
-
-let elem = document.documentElement;
-
-if(elem.requestFullscreen){
-elem.requestFullscreen();
-}
-
+    let elem = document.documentElement;
+    if(elem.requestFullscreen){ elem.requestFullscreen(); }
 }
 
 document.addEventListener("visibilitychange", function(){
-
-if(examStarted && document.hidden){
-alert("Warning: Tab switching detected.");
-}
-
+    if(examStarted && document.hidden){
+        alert("Warning: Tab switching detected.");
+    }
 });
 
 window.onbeforeunload = function(){
-
-if(examStarted){
-return "Refreshing will not stop the exam.";
+    if(examStarted){ return "Refreshing will not stop the exam."; }
 }
-
-};
 
 function loadFromURL(){
+    const params = new URLSearchParams(window.location.search);
+    const formLink = params.get("form");
+    const duration = params.get("time");
 
-const params = new URLSearchParams(window.location.search);
-
-const formLink = params.get("form");
-const duration = params.get("time");
-
-if(formLink){
-
-// Hide teacher panel for students
-document.getElementById("teacherPanel").style.display = "none";
-
-let link = decodeURIComponent(formLink);
-
-if(!link.includes("embedded")){
-link = link.replace("viewform","viewform?embedded=true");
-}
-
-formFrame.src = link;
-
-}
-
-if(duration){
-
-seconds = duration * 60;
-
-updateTimerDisplay();
-
-}
-
+    if(formLink){
+        // Hide teacher panel for students
+        document.getElementById("teacherPanel").style.display = "none";
+        let link = decodeURIComponent(formLink);
+        if(!link.includes("embedded")){ link = link.replace("viewform","viewform?embedded=true"); }
+        formFrame.src = link;
+    }
+    if(duration){
+        seconds = duration * 60;
+        updateTimerDisplay();
+    }
 }
 
 loadFromURL();
-
 </script>
 
 </body>
