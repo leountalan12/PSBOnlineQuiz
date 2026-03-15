@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Proctored Classroom Exam</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:#f4f4f4;
+margin:0;
+text-align:center;
+}
+
+header{
+background:#0d47a1;
+color:white;
+padding:15px;
+}
+
+#teacherPanel{
+background:#ffffff;
+padding:15px;
+margin:15px;
+border-radius:8px;
+box-shadow:0 0 10px rgba(0,0,0,0.2);
+}
+
+#timer{
+font-size:48px;
+font-weight:bold;
+color:#c62828;
+margin:10px;
+}
+
+#cameraBox{
+position:fixed;
+top:10px;
+right:10px;
+background:white;
+padding:5px;
+border-radius:8px;
+box-shadow:0 0 10px rgba(0,0,0,0.4);
+}
+
+video{
+width:180px;
+border-radius:6px;
+}
+
+iframe{
+width:90%;
+max-width:900px;
+height:900px;
+border:none;
+margin-top:20px;
+}
+
+button{
+padding:10px 20px;
+font-size:16px;
+margin:5px;
+cursor:pointer;
+}
+
+input{
+padding:8px;
+font-size:16px;
+margin:5px;
+}
+
+.warning{color:orange;}
+.danger{color:red;}
+
+</style>
+</head>
+
+<body>
+
+<header>
+<h2>Proctored Online Examination</h2>
+<p>Camera must stay ON. Do not switch tabs.</p>
+</header>
+
+<div id="teacherPanel">
+
+<h3>Teacher Control Panel</h3>
+
+<input id="formLink" placeholder="Paste Google Form link" size="40">
+
+<input id="duration" type="number" placeholder="Timer (minutes)" value="30">
+
+<br>
+
+<button onclick="loadForm()">Load Form</button>
+<button onclick="setTimer()">Set Timer</button>
+
+</div>
+
+<div id="timer">30:00</div>
+
+<button id="startExam">Start Exam</button>
+
+<div id="cameraBox">
+<video id="camera" autoplay muted playsinline></video>
+</div>
+
+<iframe id="examForm"></iframe>
+
+<script>
+
+let seconds = 1800;
+let timerInterval;
+let examStarted = false;
+let stream;
+
+const timerDisplay = document.getElementById("timer");
+const startBtn = document.getElementById("startExam");
+const video = document.getElementById("camera");
+
+function loadForm(){
+
+let link = document.getElementById("formLink").value;
+
+if(link===""){
+alert("Please paste a Google Form link.");
+return;
+}
+
+if(!link.includes("embedded")){
+link = link.replace("viewform","viewform?embedded=true");
+}
+
+document.getElementById("examForm").src = link;
+
+}
+
+function setTimer(){
+
+let minutes = document.getElementById("duration").value;
+
+if(minutes<=0){
+alert("Enter a valid time.");
+return;
+}
+
+seconds = minutes * 60;
+
+updateTimerDisplay();
+
+}
+
+function updateTimerDisplay(){
+
+let m = Math.floor(seconds/60);
+let s = seconds%60;
+
+timerDisplay.innerHTML =
+String(m).padStart(2,'0') + ":" +
+String(s).padStart(2,'0');
+
+}
+
+startBtn.addEventListener("click", startExam);
+
+async function startExam(){
+
+if(examStarted) return;
+
+try{
+
+stream = await navigator.mediaDevices.getUserMedia({video:true});
+
+video.srcObject = stream;
+
+examStarted = true;
+
+startTimer();
+
+openFullscreen();
+
+}
+catch(error){
+
+alert("Camera permission is required before starting.");
+
+}
+
+}
+
+function startTimer(){
+
+timerInterval = setInterval(function(){
+
+let minutes = Math.floor(seconds/60);
+let secs = seconds % 60;
+
+timerDisplay.innerHTML =
+String(minutes).padStart(2,'0') + ":" +
+String(secs).padStart(2,'0');
+
+if(seconds <= 300){
+timerDisplay.classList.add("warning");
+}
+
+if(seconds <= 60){
+timerDisplay.classList.add("danger");
+}
+
+if(seconds <= 0){
+
+clearInterval(timerInterval);
+
+alert("Time is finished. Submit your form.");
+
+window.scrollTo(0,document.body.scrollHeight);
+
+}
+
+seconds--;
+
+},1000);
+
+}
+
+function openFullscreen(){
+
+let elem = document.documentElement;
+
+if(elem.requestFullscreen){
+elem.requestFullscreen();
+}
+
+}
+
+document.addEventListener("visibilitychange", function(){
+
+if(examStarted && document.hidden){
+alert("Warning: Tab switching detected.");
+}
+
+});
+
+window.onbeforeunload = function(){
+
+if(examStarted){
+return "Refreshing will not stop the exam.";
+}
+
+};
+
+</script>
+
+</body>
+</html>
