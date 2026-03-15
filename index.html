@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSB Secured Online Summative Tests</title>
+    
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+    <style>
+        /* BASE STYLES */
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; text-align: center; overflow-x: hidden; }
+        header { background: #800000; color: white; padding: 15px; width: 100%; box-sizing: border-box; }
+        
+        /* TEACHER DASHBOARD VIEW */
+        #teacherView { display: block; padding: 10px; }
+        .configPanel { background: white; padding: 20px; border-radius: 8px; max-width: 800px; margin: 0 auto 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; padding: 10px; background: #ddd; border-radius: 8px; }
+        .studentBox { background: white; padding: 8px; border-radius: 6px; border: 1px solid #bbb; }
+        .gridVideo { width: 100%; aspect-ratio: 4/3; background: black; border-radius: 4px; }
+        .infoLabel { font-size: 12px; font-weight: bold; margin-top: 5px; color: #333; }
+        .violationBadge { color: #d32f2f; font-size: 11px; font-weight: bold; margin-top: 3px; }
+
+        /* STUDENT VIEW */
+        #studentUI { display: none; padding: 10px; }
+        #registrationOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: flex; justify-content: center; align-items: center; }
+        .regBox { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 350px; }
+        
+        /* TIMER UI */
+        .timerContainer { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+        .timerPrefix { font-size: 24px; font-weight: bold; color: #800000; background: #FFB6C1; padding: 8px 16px; border-radius: 8px; }
+        #timer { font-size: 32px; font-weight: bold; color: #c62828; background: #ADD8E6; padding: 8px 16px; border-radius: 8px; min-width: 100px; }
+        
+        /* RESPONSIVE FORM CONTAINER */
+        .form-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            height: 75vh; /* Sets height relative to the device screen height */
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* INPUTS & BUTTONS */
+        input { padding: 12px; font-size: 14px; margin: 5px; width: 85%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { padding: 12px 24px; font-size: 14px; margin: 5px; cursor: pointer; background: #800000; color: white; border: none; border-radius: 4px; font-weight: bold; }
+        #startBtn { background: #2e7d32; font-size: 18px; width: 90%; max-width: 400px; }
+
+        #cameraBox { position: fixed; top: 10px; right: 10px; background: white; padding: 4px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.4); z-index: 1000; display: none; }
+        video#localVideo { width: 120px; border-radius: 4px; }
+
+        /* MOBILE OPTIMIZATIONS */
+        @media (max-width: 600px) {
+            .timerPrefix { font-size: 18px; }
+            #timer { font-size: 24px; }
+            .form-wrapper { height: 65vh; }
+            video#localVideo { width: 80px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h2 id="mainTitle">PSB Secured Online Summative Tests</h2>
+    <p id="subTitle"></p>
+</header>
+
+<div id="registrationOverlay" style="display:none;">
+    <div class="regBox">
+        <h3>Student Login</h3>
+        <input type="text" id="stuName" placeholder="Full Name">
+        <input type="text" id="stuID" placeholder="Student ID Number">
+        <br><br>
+        <button onclick="registerStudent()">Enter Examination Room</button>
+    </div>
+</div>
+
+<div id="studentUI">
+    <div class="timerContainer">
+        <div class="timerPrefix">Timer:</div>
+        <div id="timer">30:00</div>
+    </div>
+    <br>
+    <button id="startBtn" onclick="startSecureExam()">START SECURE EXAM</button>
+    <br><br>
+    <div class="form-wrapper">
+        <iframe id="examForm" src="about:blank"></iframe>
+    </div>
+</div>
+
+<div id="teacherView">
+    <div class="configPanel">
+        <h3>Exam Configuration</h3>
+        <input id="formLink" placeholder="Paste Google Form Link">
+        <input id="timeInput" type="number" value="30" title="Minutes">
+        <br>
+        <button onclick="generateLink()">Generate Student Link</button>
+        <br>
+        <input id="studentLink" readonly placeholder="Link will appear here">
+    </div>
+    <div id="grid"></div>
+</div>
+
+<div id="cameraBox">
+    <video id="localVideo" autoplay muted playsinline></video>
+</div>
+
+<script>
+    const params = new URLSearchParams(location.search);
+    const isStudent = params.has("form");
+    const teacherPeerID = "psb-proctor-main-gateway";
+    
+    let peer, dataConn, stream;
+    let secondsLeft = 1800;
+    let tabSwitches = 0;
+    let examActive = false;
+    let studentInfo = { name: "", id: "" };
+
+    function init() {
+        if (isStudent) {
+            document.getElementById("teacherView").style.display = "none";
+            document.getElementById("registrationOverlay").style.display = "flex";
+            document.getElementById("studentUI").style.display = "block";
+            document.getElementById("mainTitle").innerText = "Test Proper";
+            
+            const formUrl = params.get("form");
+            if (formUrl) {
+                // Device optimization for Google Forms
+                let optimizedLink = decodeURIComponent(formUrl);
+                if (!optimizedLink.includes("embedded=true")) {
+                    optimizedLink = optimizedLink.includes("?") ? optimizedLink + "&embedded=true" : optimizedLink + "?embedded=true";
+                }
+                document.getElementById("examForm").src = optimizedLink;
+            }
+            if (params.get("time")) secondsLeft = parseInt(params.get("time")) * 60;
+            updateTimerDisplay();
+        } else {
+            initTeacherDashboard();
+        }
+    }
+
+    // TEACHER LOGIC
+    function initTeacherDashboard() {
+        const grid = document.getElementById("grid");
+        for (let i = 1; i <= 40; i++) {
+            const box = document.createElement("div");
+            box.className = "studentBox";
+            box.innerHTML = `
+                <video class="gridVideo" id="v-${i}" autoplay playsinline></video>
+                <div class="infoLabel" id="n-${i}">Station ${i} (Offline)</div>
+                <div class="violationBadge" id="vb-${i}">Tab Switches: 0</div>`;
+            grid.appendChild(box);
+        }
+
+        peer = new Peer(teacherPeerID);
+        let slotIndex = 1;
+
+        peer.on("call", call => {
+            const currentSlot = slotIndex++;
+            call.answer();
+            call.on("stream", remoteStream => {
+                document.getElementById(`v-${currentSlot}`).srcObject = remoteStream;
+                document.getElementById(`n-${currentSlot}`).innerText = `${call.metadata.name} [ID: ${call.metadata.id}]`;
+            });
+        });
+
+        peer.on('connection', conn => {
+            conn.on('data', data => {
+                if (data.type === "tab-violation") {
+                    const allLabels = document.querySelectorAll('.infoLabel');
+                    allLabels.forEach((label, idx) => {
+                        if (label.innerText.includes(data.studentID)) {
+                            document.getElementById(`vb-${idx+1}`).innerText = `Tab Switches: ${data.count}`;
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    // STUDENT LOGIC
+    function registerStudent() {
+        const name = document.getElementById("stuName").value.trim();
+        const id = document.getElementById("stuID").value.trim();
+        if (!name || !id) return alert("Please enter your Full Name and Student ID.");
+        studentInfo = { name, id };
+        document.getElementById("registrationOverlay").style.display = "none";
+    }
+
+    async function startSecureExam() {
+        if (!studentInfo.name) return alert("Please login first.");
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            document.getElementById("localVideo").srcObject = stream;
+            document.getElementById("cameraBox").style.display = "block";
+            document.getElementById("startBtn").style.display = "none";
+            
+            examActive = true;
+            enforceFullscreen();
+            connectToProctor();
+            startCountdown();
+            monitorTabActivity();
+        } catch (e) {
+            alert("Camera access is required. Please check your browser permissions.");
+        }
+    }
+
+    function connectToProctor() {
+        peer = new Peer();
+        peer.on("open", () => {
+            peer.call(teacherPeerID, stream, { metadata: studentInfo });
+            dataConn = peer.connect(teacherPeerID);
+        });
+    }
+
+    function monitorTabActivity() {
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden && examActive) {
+                tabSwitches++;
+                if (dataConn && dataConn.open) dataConn.send({ type: "tab-violation", count: tabSwitches, studentID: studentInfo.id });
+                if (tabSwitches > 3) {
+                    alert("Violations exceeded. Exam terminated.");
+                    window.location.href = "about:blank"; 
+                } else {
+                    alert(`Violation! Tab switch detected: ${tabSwitches}/3`);
+                }
+            }
+        });
+        window.onblur = () => { if(examActive) enforceFullscreen(); };
+    }
+
+    function enforceFullscreen() {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) elem.requestFullscreen();
+        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+        
+        document.addEventListener("fullscreenchange", () => {
+            if (examActive && !document.fullscreenElement) {
+                alert("Fullscreen is mandatory.");
+                if (elem.requestFullscreen) elem.requestFullscreen();
+            }
+        });
+    }
+
+    function startCountdown() {
+        const interval = setInterval(() => {
+            if (secondsLeft <= 0) {
+                clearInterval(interval);
+                alert("Time is up.");
+                window.location.href = "about:blank";
+                return;
+            }
+            secondsLeft--;
+            updateTimerDisplay();
+        }, 1000);
+    }
+
+    function updateTimerDisplay() {
+        let m = Math.floor(secondsLeft / 60);
+        let s = secondsLeft % 60;
+        document.getElementById("timer").innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    function generateLink() {
+        const form = document.getElementById("formLink").value.trim();
+        const time = document.getElementById("timeInput").value;
+        if (!form) return alert("Paste a Google Form link.");
+        const link = `${window.location.origin}${window.location.pathname}?form=${encodeURIComponent(form)}&time=${time}`;
+        document.getElementById("studentLink").value = link;
+    }
+
+    init();
+</script>
+</body>
+</html>
