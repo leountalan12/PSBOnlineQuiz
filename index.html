@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Classroom Proctored Exam</title>
+<title>Proctored Online Examination</title>
 
 <style>
 
@@ -34,29 +34,14 @@ input{
 padding:10px;
 font-size:16px;
 margin:5px;
-width:350px;
+width:340px;
 }
 
 button{
-padding:10px 15px;
+padding:10px 16px;
 font-size:16px;
 margin:5px;
 cursor:pointer;
-}
-
-#cameraBox{
-position:fixed;
-top:10px;
-right:10px;
-background:white;
-padding:5px;
-border-radius:8px;
-box-shadow:0 0 10px rgba(0,0,0,0.4);
-}
-
-video{
-width:180px;
-border-radius:6px;
 }
 
 iframe{
@@ -67,9 +52,27 @@ border:none;
 margin-top:20px;
 }
 
+#cameraBox{
+position:fixed;
+top:10px;
+right:10px;
+background:white;
+padding:6px;
+border-radius:8px;
+box-shadow:0 0 10px rgba(0,0,0,0.4);
+}
+
+video{
+width:180px;
+border-radius:6px;
+}
+
 #studentLink{
 width:80%;
 }
+
+.warning{color:orange;}
+.danger{color:red;}
 
 </style>
 
@@ -79,12 +82,13 @@ width:80%;
 
 <header>
 <h2>Proctored Online Examination</h2>
-<p>Camera must stay ON. Do not switch tabs.</p>
+<p>Camera must remain ON. Do not switch tabs.</p>
 </header>
 
 <div id="timer">30:00</div>
 
-<div class="panel">
+<!-- TEACHER PANEL -->
+<div class="panel" id="teacherPanel">
 
 <input id="formLink" placeholder="Paste Google Form link">
 
@@ -104,10 +108,12 @@ width:80%;
 
 </div>
 
+<!-- CAMERA MONITOR -->
 <div id="cameraBox">
 <video id="camera" autoplay muted playsinline></video>
 </div>
 
+<!-- GOOGLE FORM -->
 <iframe id="examForm"></iframe>
 
 <script>
@@ -119,6 +125,7 @@ let stream;
 
 const timerDisplay = document.getElementById("timer");
 const video = document.getElementById("camera");
+const formFrame = document.getElementById("examForm");
 
 function updateTimerDisplay(){
 
@@ -144,7 +151,7 @@ if(!link.includes("embedded")){
 link = link.replace("viewform","viewform?embedded=true");
 }
 
-document.getElementById("examForm").src = link;
+formFrame.src = link;
 
 let minutes = document.getElementById("timeInput").value;
 
@@ -210,6 +217,14 @@ timerDisplay.innerHTML =
 String(minutes).padStart(2,'0') + ":" +
 String(secs).padStart(2,'0');
 
+if(seconds <= 300){
+timerDisplay.classList.add("warning");
+}
+
+if(seconds <= 60){
+timerDisplay.classList.add("danger");
+}
+
 if(seconds <= 0){
 
 clearInterval(timerInterval);
@@ -261,13 +276,16 @@ const duration = params.get("time");
 
 if(formLink){
 
+// Hide teacher panel for students
+document.getElementById("teacherPanel").style.display = "none";
+
 let link = decodeURIComponent(formLink);
 
 if(!link.includes("embedded")){
 link = link.replace("viewform","viewform?embedded=true");
 }
 
-document.getElementById("examForm").src = link;
+formFrame.src = link;
 
 }
 
