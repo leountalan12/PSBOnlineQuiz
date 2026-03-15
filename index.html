@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PSB Secured Online Summative Tests</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:#f4f4f4;
+margin:0;
+text-align:center;
+}
+
+header{
+background:#800000;
+color:white;
+padding:15px;
+}
+
+.timerBox{
+margin-top:20px;
+display:flex;
+flex-direction:column;
+align-items:center;
+gap:10px;
+}
+
+.timerRow{
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.timerLabel{
+background:#FFB6C1;
+padding:8px 14px;
+border-radius:6px;
+font-weight:bold;
+}
+
+#timer{
+font-size:48px;
+font-weight:bold;
+color:#c62828;
+background:#ADD8E6;
+padding:10px 20px;
+border-radius:8px;
+}
+
+input{
+padding:10px;
+font-size:16px;
+margin:5px;
+width:340px;
+}
+
+button{
+padding:10px 16px;
+font-size:16px;
+margin:5px;
+cursor:pointer;
+}
+
+iframe{
+width:90%;
+max-width:900px;
+height:900px;
+border:none;
+margin-top:20px;
+}
+
+#cameraBox{
+position:fixed;
+top:10px;
+right:10px;
+background:white;
+padding:6px;
+border-radius:8px;
+box-shadow:0 0 10px rgba(0,0,0,0.4);
+}
+
+video{
+width:180px;
+border-radius:6px;
+}
+
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
+
+</head>
+
+<body>
+
+<header>
+<h2>PSB Secured Online Summative Tests</h2>
+<p>Camera must remain ON. Do not switch tabs.</p>
+</header>
+
+<div class="timerBox">
+
+<div class="timerRow">
+<div class="timerLabel">Timer</div>
+<div id="timer">30:00</div>
+</div>
+
+<input id="studentName" placeholder="Enter your full name before starting exam">
+
+<button id="startExam">Start Exam</button>
+
+<button onclick="window.open('teacher_dashboard.html')">
+Open Teacher Dashboard
+</button>
+
+</div>
+
+<div id="cameraBox">
+<video id="camera" autoplay muted playsinline></video>
+</div>
+
+<iframe id="examForm"></iframe>
+
+<script>
+
+let seconds = 1800;
+let examStarted=false;
+let stream;
+
+let peer;
+let studentName="";
+
+const timerDisplay=document.getElementById("timer");
+const video=document.getElementById("camera");
+
+document.getElementById("startExam").onclick=startExam;
+
+async function startExam(){
+
+studentName=document.getElementById("studentName").value;
+
+if(studentName===""){
+alert("Enter your name first");
+return;
+}
+
+stream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+
+video.srcObject=stream;
+
+peer=new Peer();
+
+peer.on("open",id=>{
+
+const conn=peer.connect("teacher-dashboard");
+
+conn.on("open",()=>{
+
+conn.send({
+type:"join",
+name:studentName,
+peerId:id
+});
+
+});
+
+});
+
+peer.on("call",call=>{
+
+call.answer(stream);
+
+});
+
+examStarted=true;
+
+startTimer();
+openFullscreen();
+
+}
+
+function startTimer(){
+
+setInterval(()=>{
+
+let m=Math.floor(seconds/60);
+let s=seconds%60;
+
+timerDisplay.innerHTML=
+String(m).padStart(2,'0')+":"+String(s).padStart(2,'0');
+
+seconds--;
+
+if(seconds<=0){
+alert("Time finished");
+}
+
+},1000);
+
+}
+
+function openFullscreen(){
+
+if(document.documentElement.requestFullscreen){
+document.documentElement.requestFullscreen();
+}
+
+}
+
+document.addEventListener("visibilitychange",()=>{
+
+if(document.hidden){
+alert("Warning: Tab switching detected");
+}
+
+});
+
+</script>
+
+</body>
+</html>

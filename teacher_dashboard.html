@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Teacher Monitoring Dashboard</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:#f4f4f4;
+margin:0;
+text-align:center;
+}
+
+header{
+background:#800000;
+color:white;
+padding:15px;
+}
+
+#grid{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:10px;
+padding:20px;
+}
+
+.studentCard{
+background:white;
+padding:10px;
+border-radius:8px;
+box-shadow:0 0 5px rgba(0,0,0,0.3);
+}
+
+video{
+width:100%;
+border-radius:6px;
+}
+
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
+
+</head>
+
+<body>
+
+<header>
+
+<h2>Teacher Monitoring Dashboard</h2>
+
+<button onclick="location.href='index.html'">
+Back to Exam Panel
+</button>
+
+</header>
+
+<h3 id="studentCount">Students Connected: 0</h3>
+
+<div id="grid"></div>
+
+<script>
+
+let peer=new Peer("teacher-dashboard");
+
+let students={};
+
+peer.on("connection",conn=>{
+
+conn.on("data",data=>{
+
+if(data.type==="join"){
+
+addStudent(data.name,data.peerId);
+
+}
+
+});
+
+});
+
+function addStudent(name,peerId){
+
+if(Object.keys(students).length>=50) return;
+
+let grid=document.getElementById("grid");
+
+let card=document.createElement("div");
+
+card.className="studentCard";
+
+card.innerHTML=`
+
+<h3>${name}</h3>
+
+<video id="video_${peerId}" autoplay playsinline></video>
+
+`;
+
+grid.appendChild(card);
+
+let call=peer.call(peerId,null);
+
+call.on("stream",stream=>{
+
+document.getElementById("video_"+peerId).srcObject=stream;
+
+});
+
+students[peerId]=name;
+
+document.getElementById("studentCount").innerText=
+"Students Connected: "+Object.keys(students).length;
+
+}
+
+</script>
+
+</body>
+</html>
