@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PSB Secured Online Summative Tests</title>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:#f4f4f4;
+margin:0;
+text-align:center;
+}
+
+header{
+background:#800000;
+color:white;
+padding:15px;
+}
+
+.timerBox{
+margin-top:15px;
+display:flex;
+flex-direction:column;
+align-items:center;
+gap:10px;
+}
+
+.timerRow{
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.timerLabel{
+background:#FFB6C1;
+padding:8px 14px;
+border-radius:6px;
+font-weight:bold;
+}
+
+#timer{
+font-size:48px;
+font-weight:bold;
+color:#c62828;
+background:#ADD8E6;
+padding:10px 20px;
+border-radius:8px;
+}
+
+.panel{
+margin:15px;
+}
+
+input{
+padding:10px;
+font-size:16px;
+margin:5px;
+width:340px;
+}
+
+button{
+padding:10px 16px;
+font-size:16px;
+margin:5px;
+cursor:pointer;
+}
+
+iframe{
+width:90%;
+max-width:900px;
+height:900px;
+border:none;
+margin-top:20px;
+}
+
+#cameraBox{
+position:fixed;
+top:10px;
+right:10px;
+background:white;
+padding:6px;
+border-radius:8px;
+box-shadow:0 0 10px rgba(0,0,0,0.4);
+}
+
+video{
+width:180px;
+border-radius:6px;
+}
+
+#studentLink{
+width:80%;
+}
+
+.warning{color:orange;}
+.danger{color:red;}
+
+#dashboard{
+display:flex;
+margin-top:20px;
+}
+
+#grid{
+flex:3;
+display:grid;
+grid-template-columns:repeat(auto-fill,220px);
+gap:10px;
+padding:10px;
+}
+
+.studentBox{
+background:white;
+padding:5px;
+border-radius:6px;
+box-shadow:0 0 6px rgba(0,0,0,0.3);
+}
+
+.gridVideo{
+width:200px;
+background:black;
+border-radius:5px;
+}
+
+.name{
+font-weight:bold;
+}
+
+#rightPanel{
+flex:1;
+background:white;
+padding:10px;
+border-left:2px solid #ddd;
+height:90vh;
+overflow:auto;
+text-align:left;
+}
+
+.log{
+font-size:12px;
+border-bottom:1px solid #eee;
+padding:3px;
+}
+
+.alert{
+color:red;
+font-weight:bold;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+<h2>PSB Secured Online Summative Tests</h2>
+<p>Camera must remain ON. Do not switch tabs.</p>
+</header>
+
+<div class="timerBox">
+
+<div class="timerRow">
+<div class="timerLabel">Timer</div>
+<div id="timer">30:00</div>
+</div>
+
+<button id="startExam">Start Exam</button>
+
+</div>
+
+<!-- TEACHER PANEL -->
+<div class="panel" id="teacherPanel">
+
+<input id="formLink" placeholder="Paste Google Form link">
+
+<input id="timeInput" type="number" placeholder="Timer (minutes)" value="30">
+
+<br>
+
+<button onclick="loadForm()">Load Form</button>
+<button onclick="generateLink()">Generate Student Link</button>
+
+<br><br>
+
+<input id="studentLink" readonly placeholder="Student exam link will appear here">
+
+</div>
+
+<!-- CAMERA -->
+<div id="cameraBox">
+<video id="camera" autoplay muted playsinline></video>
+</div>
+
+<!-- FORM -->
+<iframe id="examForm"></iframe>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+
+<div id="grid"></div>
+
+<div id="rightPanel">
+
+<h3>Attendance</h3>
+<div id="attendance"></div>
+
+<h3>Alerts</h3>
+<div id="alerts"></div>
+
+<h3>Join / Leave Logs</h3>
+<div id="logs"></div>
+
+<h3>Evidence</h3>
+<div id="evidence"></div>
+
+</div>
+
+</div>
+
+<script>
+
+const params=new URLSearchParams(location.search);
+const mode=params.get("mode")||"student";
+
+const teacherID="teacher-room";
+
+let peer;
+let stream;
+
+let seconds=1800;
+let timerInterval;
+let examStarted=false;
+
+let violations=0;
+const maxViolations=3;
+
+const timerDisplay=document.getElementById("timer");
+const video=document.getElementById("camera");
+const formFrame=document.getElementById("examForm");
+
+const grid=document.getElementById("grid");
+const attendance=document.getElementById("attendance");
+const alerts=document.getElementById("alerts");
+const logs=document.getElementById("logs");
+const evidence=document.getElementById("evidence");
+
+let studentList=[];
+
+function updateTimerDisplay(){
+let m=Math.floor(seconds/60);
+let s=seconds%60;
+timerDisplay.innerHTML=String(m).padStart(2,'0')+":"+String(s).padStart(2,'0');
+}
+
+function startTimer(){
+
+timerInterval=setInterval(()=>{
+
+updateTimerDisplay();
+
+if(seconds<=300)timerDisplay.classList.add("warning");
+if(seconds<=60)timerDisplay.classList.add("danger");
+
+if(seconds<=0){
+
+clearInterval(timerInterval);
+
+alert("Time finished. Submit form.");
+
+window.scrollTo(0,document.body.scrollHeight);
+
+}
+
+seconds--;
+
+},1000);
+
+}
+
+async function startExam(){
+
+if(examStarted)return;
+
+try{
+
+stream=await navigator.mediaDevices.getUserMedia({video:true});
+
+video.srcObject=stream;
+
+examStarted=true;
+
+openFullscreen();
+
+startTimer();
+
+connectToTeacher();
+
+monitorCamera();
+
+faceCheck();
+
+autoScreenshot();
+
+}catch(e){
+
+alert("Camera permission required.");
+
+}
+
+}
+
+document.getElementById("startExam").onclick=startExam;
+
+function connectToTeacher(){
+
+peer=new Peer();
+
+peer.on("open",id=>{
+
+peer.call(teacherID,stream,{metadata:{name:id}});
+
+});
+
+}
+
+if(mode==="teacher"){
+
+peer=new Peer(teacherID);
+
+peer.on("call",call=>{
+
+const name=call.metadata.name;
+
+studentList.push(name);
+updateAttendance();
+logEvent(name+" joined");
+
+call.answer();
+
+call.on("stream",remoteStream=>{
+
+const box=document.createElement("div");
+box.className="studentBox";
+
+const v=document.createElement("video");
+v.srcObject=remoteStream;
+v.autoplay=true;
+v.className="gridVideo";
+
+const label=document.createElement("div");
+label.className="name";
+label.innerText=name;
+
+box.appendChild(v);
+box.appendChild(label);
+
+grid.appendChild(box);
+
+});
+
+call.on("close",()=>{
+
+logEvent(name+" left");
+
+});
+
+});
+
+}
+
+function updateAttendance(){
+attendance.innerHTML=studentList.join("<br>");
+}
+
+function logEvent(text){
+
+const d=document.createElement("div");
+d.className="log";
+d.innerText=new Date().toLocaleTimeString()+" - "+text;
+
+logs.prepend(d);
+
+}
+
+function alertTeacher(text){
+
+const a=document.createElement("div");
+a.className="alert";
+a.innerText=text;
+
+alerts.prepend(a);
+
+}
+
+function monitorCamera(){
+
+setInterval(()=>{
+
+if(video.readyState<2){
+
+violationDetected("Camera disconnected");
+
+}
+
+},5000);
+
+}
+
+function faceCheck(){
+
+const canvas=document.createElement("canvas");
+const ctx=canvas.getContext("2d");
+
+setInterval(()=>{
+
+canvas.width=video.videoWidth;
+canvas.height=video.videoHeight;
+
+ctx.drawImage(video,0,0);
+
+const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+
+let brightness=0;
+
+for(let i=0;i<data.length;i+=4){
+brightness+=data[i];
+}
+
+brightness/=data.length/4;
+
+if(brightness<20){
+
+violationDetected("Face not detected");
+
+}
+
+},8000);
+
+}
+
+function autoScreenshot(){
+
+const canvas=document.createElement("canvas");
+const ctx=canvas.getContext("2d");
+
+setInterval(()=>{
+
+canvas.width=video.videoWidth;
+canvas.height=video.videoHeight;
+
+ctx.drawImage(video,0,0);
+
+const img=canvas.toDataURL("image/png");
+
+if(mode==="teacher"){
+
+const i=document.createElement("img");
+i.src=img;
+i.style.width="100%";
+evidence.prepend(i);
+
+}
+
+},20000);
+
+}
+
+function openFullscreen(){
+
+let elem=document.documentElement;
+
+if(elem.requestFullscreen){
+elem.requestFullscreen();
+}
+
+}
+
+function violationDetected(reason){
+
+if(!examStarted)return;
+
+violations++;
+
+alert(reason+"\nViolation "+violations+"/"+maxViolations);
+
+alertTeacher(reason);
+
+if(violations>=maxViolations){
+
+alert("Exam terminated");
+
+location.reload();
+
+}
+
+}
+
+document.addEventListener("visibilitychange",function(){
+
+if(document.hidden){
+violationDetected("Tab switching detected");
+}
+
+});
+
+window.addEventListener("blur",function(){
+
+violationDetected("Window focus lost");
+
+});
+
+document.addEventListener("fullscreenchange",function(){
+
+if(examStarted && !document.fullscreenElement){
+violationDetected("Fullscreen exited");
+openFullscreen();
+}
+
+});
+
+function loadForm(){
+
+let link=document.getElementById("formLink").value;
+
+if(!link.includes("embedded")){
+link=link.replace("viewform","viewform?embedded=true");
+}
+
+formFrame.src=link;
+
+let minutes=document.getElementById("timeInput").value;
+seconds=minutes*60;
+
+updateTimerDisplay();
+
+}
+
+function generateLink(){
+
+let form=document.getElementById("formLink").value;
+let time=document.getElementById("timeInput").value;
+
+let baseURL=window.location.origin+window.location.pathname;
+
+let link=baseURL+"?form="+encodeURIComponent(form)+"&time="+time;
+
+document.getElementById("studentLink").value=link;
+
+}
+
+function loadFromURL(){
+
+const params=new URLSearchParams(window.location.search);
+
+const formLink=params.get("form");
+const duration=params.get("time");
+
+if(formLink){
+
+document.getElementById("teacherPanel").style.display="none";
+
+let link=decodeURIComponent(formLink);
+
+if(!link.includes("embedded")){
+link=link.replace("viewform","viewform?embedded=true");
+}
+
+formFrame.src=link;
+
+}
+
+if(duration){
+
+seconds=duration*60;
+updateTimerDisplay();
+
+}
+
+}
+
+loadFromURL();
+
+updateTimerDisplay();
+
+</script>
+
+</body>
+</html>
