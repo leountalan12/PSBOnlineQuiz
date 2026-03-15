@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PSB Secure Online Exam</title>
+
+<link rel="stylesheet" href="styles.css">
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
+
+</head>
+
+<body>
+
+<header>
+<h2>PSB Secure Online Summative Test</h2>
+<p>Camera must remain ON | Do not switch tabs</p>
+</header>
+
+<div class="panel">
+
+<input id="studentName" placeholder="Enter your name">
+
+<button id="startExam">Start Exam</button>
+
+<button onclick="window.open('teacher_dashboard.html')">
+Teacher Dashboard
+</button>
+
+</div>
+
+<div id="timer">30:00</div>
+
+<div id="cameraBox">
+<video id="camera" autoplay muted playsinline></video>
+</div>
+
+<iframe id="examForm"></iframe>
+
+<script src="student.js"></script>
+<script src="ai_proctor.js"></script>
+
+</body>
+</html>
