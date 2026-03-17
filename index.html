@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PSB SECURED TEST PORTAL 2026</title>
+    
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; margin: 0; color: #1c1e21; }
+        header { background: #800000; color: white; padding: 15px; font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        
+        /* Dashboard */
+        #teacherView { padding: 20px; }
+        .setup-card { background: white; padding: 25px; border-radius: 12px; max-width: 700px; margin: 0 auto 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-top: 6px solid #800000; }
+        .input-row { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        .input-group { text-align: left; flex: 1; min-width: 200px; }
+        .input-group label { display: block; font-size: 11px; font-weight: bold; color: #666; margin-bottom: 5px; text-transform: uppercase; }
+        
+        .btn { padding: 12px 20px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
+        .btn-gen { background: #0056b3; }
+        .btn-launch { background: #2e7d32; }
+        .btn-export { background: #ef6c00; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        
+        /* The Grid Fix */
+        #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 15px; padding: 10px; }
+        .student-box { background: #fff; padding: 10px; border-radius: 10px; border: 1px solid #ddd; text-align: left; position: relative; }
+        .student-box.active { border-left: 6px solid #2e7d32; }
+        .student-box.warning { border: 2px solid #d32f2f; background: #fff8f7; }
+
+        .grid-video { width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 6px; object-fit: cover; }
+        .student-identity { background: #f8f9fa; padding: 8px; border-radius: 4px; border-left: 4px solid #800000; margin: 8px 0; }
+        .id-name { font-size: 14px; font-weight: bold; color: #800000; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        .stat-row { font-size: 11px; margin: 4px 0; display: flex; justify-content: space-between; border-bottom: 1px solid #eee; }
+        .v-val { color: #d32f2f; font-weight: bold; }
+
+        /* Student View */
+        #studentUI { display: none; padding: 15px; }
+        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.98); z-index: 10000; display: flex; align-items: center; justify-content: center; }
+        .login-box { background: white; padding: 35px; border-radius: 15px; width: 350px; }
+        
+        .timer-box { background: #e3f2fd; padding: 10px 20px; border-radius: 8px; border: 2px solid #bbdefb; display: inline-block; margin-bottom: 15px; }
+        #timer { font-size: 32px; font-weight: bold; color: #d32f2f; font-family: monospace; }
+        
+        .iframe-container { width: 100%; max-width: 1200px; margin: 0 auto; height: 75vh; border: 3px solid #800000; border-radius: 8px; background: white; }
+        iframe { width: 100%; height: 100%; border: none; }
+
+        input { padding: 12px; width: 100%; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        input.error { border: 2px solid #ff4444; }
+
+        #localCam { position: fixed; bottom: 20px; right: 20px; width: 140px; border: 3px solid white; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 999; display: none; }
+        .fix-btn { background: #555; font-size: 10px; margin-top: 5px; display: none; }
+    </style>
+</head>
+<body>
+
+<header>PSB SECURED ONLINE SUMMATIVE TESTS</header>
+
+<div id="overlay" style="display:none;">
+    <div class="login-box">
+        <h3 style="color:#800000">Verify Identity</h3>
+        <input type="text" id="sName" placeholder="Full Name" style="margin-bottom:10px;">
+        <input type="text" id="sID" placeholder="Student ID Number">
+        <button onclick="enterExam()" class="btn btn-gen" style="width:100%; margin-top:20px;">Enter Exam</button>
+    </div>
+</div>
+
+<div id="teacherView">
+    <div class="setup-card">
+        <div class="input-row">
+            <div class="input-group"><label>Grade & Section</label><input id="tGrade" placeholder="12-STE"></div>
+            <div class="input-group"><label>Teacher Name</label><input id="tName" placeholder="Surname"></div>
+        </div>
+        <div class="input-group" style="margin-bottom:15px;"><label>Form URL</label><input id="tForm" placeholder="Google Form Link"></div>
+        <div class="input-row">
+            <div class="input-group"><label>Minutes</label><input id="tMinutes" type="number" value="60"></div>
+            <div class="input-group"><label>Student Count</label><input id="tCount" type="number" value="40"></div>
+        </div>
+        <input id="copyLink" readonly style="background:#f9f9f9; margin-bottom:15px;" placeholder="Link will appear here...">
+        <div style="display:flex; gap:10px;">
+            <button class="btn btn-gen" onclick="generateLink()">1. Create Link</button>
+            <button id="launchBtn" class="btn btn-launch" onclick="initTeacher()" disabled>2. Start Session</button>
+            <button class="btn btn-export" onclick="exportReport()">Export CSV</button>
+        </div>
+        <div id="roomStatus" style="margin-top:10px; font-weight:bold;"></div>
+    </div>
+    <div id="grid"></div>
+</div>
+
+<div id="studentUI">
+    <div class="timer-box">
+        <span style="font-size:10px;">TIME REMAINING</span><br><div id="timer">00:00</div>
+    </div><br>
+    <button id="btnStart" class="btn btn-launch" style="padding:15px 40px; margin-bottom:10px;" onclick="startOfficialTest()">Authorize Camera & Begin</button>
+    <div id="formContainer" class="iframe-container">
+        <iframe id="testFrame"></iframe>
+    </div>
+    <button id="btnFixForm" class="btn fix-btn" onclick="forceLoad()">Form not showing? Click to refresh</button>
+</div>
+
+<video id="localCam" autoplay muted playsinline></video>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const isStudent = urlParams.has("form");
+    const APP_ID = "PSB_2026_PRO_"; 
+    const PEER_CONFIG = { config: { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }, { 'urls': 'stun:stun1.l.google.com:19302' }] } };
+    
+    let peer, dataConns = {}, stream, isRunning = false, roomId = "", timeLeft = 0;
+    let masterData = [];
+
+    // Initialization
+    async function init() {
+        if (isStudent) {
+            document.getElementById("teacherView").style.display = "none";
+            document.getElementById("overlay").style.display = "flex";
+            document.getElementById("studentUI").style.display = "block";
+            roomId = APP_ID + urlParams.get("room");
+            timeLeft = parseInt(urlParams.get("time")) * 60;
+            updateTimer();
+            await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
+        }
+    }
+
+    // Teacher Logic
+    function generateLink() {
+        const grade = document.getElementById("tGrade").value.trim();
+        const teacher = document.getElementById("tName").value.trim();
+        let form = document.getElementById("tForm").value.trim();
+        
+        if (!grade || !teacher || !form) return alert("Fill all fields");
+        
+        // Correct Google Form Embedding
+        if (form.includes("/viewform")) form = form.replace("/viewform", "/embeddedform");
+        
+        const seed = btoa(grade + teacher).substring(0, 8).toLowerCase();
+        const link = `${window.location.origin}${window.location.pathname}?form=${encodeURIComponent(form)}&time=${document.getElementById("tMinutes").value}&room=${seed}`;
+        
+        document.getElementById("copyLink").value = link;
+        document.getElementById("launchBtn").disabled = false;
+    }
+
+    function initTeacher() {
+        const seed = btoa(document.getElementById("tGrade").value + document.getElementById("tName").value).substring(0, 8).toLowerCase();
+        roomId = APP_ID + seed;
+        
+        peer = new Peer(roomId, PEER_CONFIG);
+        
+        peer.on('open', (id) => {
+            document.getElementById("roomStatus").innerText = "CONNECTED: " + id;
+            document.getElementById("launchBtn").disabled = true;
+        });
+
+        const count = document.getElementById("tCount").value;
+        const grid = document.getElementById("grid");
+        grid.innerHTML = "";
+        for (let i = 1; i <= count; i++) {
+            grid.innerHTML += `
+                <div class="student-box" id="slot-${i}" data-occupied="false">
+                    <video class="grid-video" autoplay muted playsinline></video>
+                    <div class="student-identity"><span class="id-name">Station ${i}</span><span class="id-num" style="font-size:10px; color:#888;">Standby</span></div>
+                    <div class="stat-row">Start: <span class="t-start">--</span> | End: <span class="t-end">--</span></div>
+                    <div class="stat-row">Tabs Switched: <span class="v-val v-t">0</span></div>
+                    <div class="stat-row">Gaze Lost: <span class="v-val v-g">0</span></div>
+                    <button class="btn-kick" style="display:none; width:100%; background:#ff4444; border:none; color:white; font-size:10px; padding:5px; margin-top:5px; border-radius:4px; cursor:pointer" onclick="kick('${i}')">Terminate</button>
+                </div>`;
+        }
+
+        peer.on('call', call => {
+            call.answer();
+            call.on('stream', remoteStream => {
+                // Fix: Check if student already exists in grid to prevent double-showing
+                let existingSlot = Array.from(document.querySelectorAll('.student-box')).find(s => s.dataset.sid === call.metadata.id);
+                let slot = existingSlot || Array.from(document.querySelectorAll('.student-box')).find(s => s.dataset.occupied === "false");
+                
+                if (slot) {
+                    slot.dataset.occupied = "true";
+                    slot.dataset.peerid = call.peer;
+                    slot.dataset.sid = call.metadata.id;
+                    slot.classList.add('active');
+                    const vid = slot.querySelector('video');
+                    if (vid.srcObject !== remoteStream) vid.srcObject = remoteStream;
+                    slot.querySelector('.id-name').innerText = call.metadata.name;
+                    slot.querySelector('.id-num').innerText = "ID: " + call.metadata.id;
+                    slot.querySelector('.btn-kick').style.display = "block";
+                }
+            });
+        });
+
+        peer.on('connection', conn => {
+            dataConns[conn.peer] = conn;
+            conn.on('data', data => {
+                const box = document.querySelector(`.student-box[data-sid="${data.sid}"]`);
+                if (box) {
+                    box.querySelector('.t-start').innerText = data.start;
+                    box.querySelector('.t-end').innerText = data.end || "--";
+                    box.querySelector('.v-t').innerText = data.tabs;
+                    box.querySelector('.v-g').innerText = data.gazes;
+                    if (data.tabs > 2 || data.gazes > 15) box.classList.add('warning');
+                    
+                    const idx = masterData.findIndex(s => s.id === data.sid);
+                    const entry = { name: data.name, id: data.sid, start: data.start, end: data.end || "Active", tabs: data.tabs, gaze: data.gazes };
+                    if (idx > -1) masterData[idx] = entry; else masterData.push(entry);
+                }
+            });
+        });
+    }
+
+    function kick(slotId) {
+        const box = document.getElementById(`slot-${slotId}`);
+        const pid = box.dataset.peerid;
+        if (pid && dataConns[pid]) {
+            if(confirm("Kick student?")) dataConns[pid].send({ cmd: "KICK" });
+        }
+    }
+
+    function exportReport() {
+        let csv = "Name,ID,Start,End,Tabs,Gaze\n";
+        masterData.forEach(s => csv += `"${s.name}","${s.id}","${s.start}","${s.end}",${s.tabs},${s.gaze}\n`);
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Report_${document.getElementById("tGrade").value}.csv`;
+        a.click();
+    }
+
+    // Student Logic
+    function forceLoad() {
+        document.getElementById("testFrame").src = decodeURIComponent(urlParams.get("form"));
+    }
+
+    function enterExam() {
+        const n = document.getElementById("sName").value.trim();
+        const i = document.getElementById("sID").value.trim();
+        if (!n || !i) return alert("Enter Name and ID");
+        document.getElementById("overlay").style.display = "none";
+        document.getElementById("btnFixForm").style.display = "block";
+        forceLoad();
+    }
+
+    async function startOfficialTest() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+            document.getElementById("localCam").srcObject = stream;
+            document.getElementById("localCam").style.display = "block";
+            document.getElementById("btnStart").style.display = "none";
+            isRunning = true;
+            window.startTime = new Date().toLocaleTimeString();
+            
+            if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+            
+            peer = new Peer(null, PEER_CONFIG);
+            peer.on('open', (id) => {
+                const connect = () => {
+                    const meta = { name: document.getElementById("sName").value, id: document.getElementById("sID").value };
+                    peer.call(roomId, stream, { metadata: meta });
+                    const c = peer.connect(roomId);
+                    c.on('data', d => { if (d.cmd === "KICK") endSession(); });
+                    window.activeConn = c;
+                    sync();
+                };
+                connect();
+                setInterval(connect, 30000); // Keep-alive
+            });
+
+            setInterval(() => {
+                if (timeLeft <= 0) endSession();
+                if (isRunning) { timeLeft--; updateTimer(); }
+            }, 1000);
+
+            document.addEventListener("visibilitychange", () => { if (document.hidden && isRunning) { window.tC = (window.tC || 0) + 1; sync(); } });
+            setInterval(async () => {
+                if (!isRunning) return;
+                const det = await faceapi.detectSingleFace(document.getElementById("localCam"), new faceapi.TinyFaceDetectorOptions());
+                if (!det) { window.gC = (window.gC || 0) + 1; sync(); }
+            }, 3000);
+
+        } catch (e) { alert("Camera Permission Required"); }
+    }
+
+    function sync(endTime = null) {
+        if (window.activeConn && window.activeConn.open) {
+            window.activeConn.send({ 
+                name: document.getElementById("sName").value,
+                sid: document.getElementById("sID").value, 
+                tabs: window.tC || 0, gazes: window.gC || 0, 
+                start: window.startTime, end: endTime 
+            });
+        }
+    }
+
+    function updateTimer() {
+        let m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+        document.getElementById("timer").innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    function endSession() {
+        isRunning = false;
+        sync(new Date().toLocaleTimeString());
+        alert("Session Ended");
+        window.location.href = "about:blank";
+    }
+
+    init();
+</script>
+</body>
+</html>
